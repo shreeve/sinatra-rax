@@ -11,4 +11,5 @@ Gem::Specification.new do |s|
   s.license     = "MIT"
   s.files       = `git ls-files`.split("\n") - %w[.gitignore]
   s.executables = `cd bin && git ls-files .`.split("\n")
+  s.add_runtime_dependency 'rack/test', '~> 2.0'
 end

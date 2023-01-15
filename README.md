@@ -13,6 +13,21 @@
 7. Call `routes` to show list sorted by route
 8. Call `props` to show application settings
 
+## Install
+
+Install via `rubygems` with:
+
+```
+gem install sinatra-rax
+```
+
+Or, add to your `Gemfile` using `Bundler` with:
+
+```
+bundle add sinatra-rax
+```
+
+This will add an executable in your path, which you can launch by typing `rax`.
 
 ## Examples
 
