@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+
+# ==============================================================================
+# rax - A minimal and modern Ruby/IRB console for Sinatra apps
+#
+# Author: Steve Shreeve (steve.shreeve@gmail.com)
+#   Date: Jan 15, 2023
+# ==============================================================================
+# NOTE: Here are the goals...
+#
+# 1. Call `app.get '/'` to trigger a request
+# 2. Easily call Sinatra helpers, such as `app.current_weather`
+# 3. Set ivars like `app.set(name: 'bob', age: 25)`
+# 4. Use templates like `app.erb :test` (using `name` from above)
+# 5. Set ivars like `@name='mike'`, then `app.erb :test, scope: self`
+# 6. Normal access to database calls, like `Sponsor[2]` to show a record
+# 7. Call `routes` to show list sorted by route
+# 8. Call `props` to show application settings
+# ==============================================================================
+
+STDOUT.sync = true
+
+require 'bundler/setup'
+require 'irb'
+require 'rack/test'
+
+IRB::ExtendCommandBundle::HushAliasWarning = true
+
+class Rax
+  attr_reader :env, :app
+
+  def initialize(file=nil)
+    @env = ENV['APP_ENV'] ||= ENV['RACK_ENV'] || 'development'
+    @app = Rack::Builder.parse_file(file || ENV['RACK_CONFIG'] || 'config.ru')[0]
+  end
+
+  def self.instance
+    @instance ||= new
+  end
+
+  def self.app
+    instance.app
+  end
+end
+
+def env
+  @env ||= Rax.instance.env
+end
+
+def app
+  @app ||= begin
+    app          = Rax.app.new!
+    app.app      = Rax.app
+    app.extend     Rack::Test::Methods
+    app.request  = Sinatra::Request.new({})
+    app.response = Sinatra::Response.new
+    app
+  end
+end
+
+def app!
+  @app = nil
+  app
+end
+
+def app.set(**vars)
+  vars.each {|k,v| instance_variable_set "@#{k}", v }
+  self
+end
+
+def display(list)
+  wide = list.map {|e| e[0].length }.max
+  list.each {|a, b| puts "%-*s  %s" % [wide, a, b.inspect] }
+  nil
+end
+
+def routes
+  list = Rax.app.routes.except 'HEAD'
+  list = list.inject([]) do |list, (meth, hits)|
+    list += hits.map {|vals| [meth.downcase, vals[0].to_s] }
+  end
+  list = list.sort_by {|a, b| [b, a]}
+  display list
+end
+
+def props
+  skip = %w[ inline_templates methodoverride ]
+  list = app.methods(false) | Rax.app.methods(false) | Sinatra::Base.methods(false)
+  list = list.filter_map {|meth| meth[/^(.*?)=$/, 1] }.sort - skip
+  list = list.map {|meth| [meth, (Rax.app.send(meth) rescue $!.inspect)] }
+  display list
+end
+
+# launch IRB
+IRB.setup nil
+IRB.conf[:IRB_NAME] = "\e[36m#{env}\e[0m"
+IRB::Irb.new.run IRB.conf
